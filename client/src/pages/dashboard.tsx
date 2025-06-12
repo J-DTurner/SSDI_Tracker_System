@@ -1,14 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { User, Section, Document } from "@shared/schema";
-import ProgressOverview from "@/components/progress-overview";
 import SectionCard from "@/components/section-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ActionCenter from "@/components/action-center";
+import { useRef, createRef, useEffect, useState } from "react";
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [uploaderToOpen, setUploaderToOpen] = useState<number | null>(null);
 
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/user"],
@@ -17,6 +19,12 @@ export default function Dashboard() {
   const { data: sections, isLoading: sectionsLoading } = useQuery<Section[]>({
     queryKey: ["/api/sections"],
   });
+
+  // Create a ref for each section card
+  const sectionRefs = useRef<React.RefObject<HTMLDivElement>[]>([]);
+  if (sections && sectionRefs.current.length !== sections.length) {
+    sectionRefs.current = sections.map(() => createRef<HTMLDivElement>());
+  }
 
   if (userLoading || sectionsLoading) {
     return (
@@ -46,6 +54,23 @@ export default function Dashboard() {
     // In a real implementation, this would open a help center or contact form
   };
 
+  const handleUploadClick = (sectionId: number) => {
+    const sectionIndex = sections?.findIndex(s => s.id === sectionId);
+    if (sectionIndex !== undefined && sectionIndex !== -1) {
+      const sectionRef = sectionRefs.current[sectionIndex];
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setUploaderToOpen(sectionId);
+    }
+  };
+
+  useEffect(() => {
+    if (uploaderToOpen) {
+      // Reset the state after a short delay to allow re-triggering
+      const timer = setTimeout(() => setUploaderToOpen(null), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploaderToOpen]);
+
   return (
     <div className="min-h-screen bg-ssdi-light">
       {/* Header */}
@@ -73,13 +98,18 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 pb-12">
-        {/* Progress Overview */}
-        {sections && <ProgressOverview sections={sections} />}
-
+        {/* ADD ACTION CENTER */}
+        <ActionCenter onUploadClick={handleUploadClick} />
+        
         {/* Task Sections */}
         <div className="space-y-8 mb-12">
-          {sections?.map((section) => (
-            <SectionCard key={section.id} section={section} />
+          {sections?.map((section, index) => (
+            <div key={section.id} ref={sectionRefs.current[index]}>
+                <SectionCard 
+                    section={section} 
+                    triggerUpload={uploaderToOpen === section.id}
+                />
+            </div>
           ))}
         </div>
 

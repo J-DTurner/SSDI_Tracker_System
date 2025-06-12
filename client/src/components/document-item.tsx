@@ -23,6 +23,7 @@ export default function DocumentItem({ document }: DocumentItemProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/sections/${document.sectionId}/documents`] });
       queryClient.invalidateQueries({ queryKey: ["/api/sections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/action-items"] });
       toast({
         title: "Document Deleted",
         description: "The document has been removed successfully.",

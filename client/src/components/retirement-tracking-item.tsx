@@ -20,6 +20,7 @@ export default function RetirementTrackingItem({ tracking }: RetirementTrackingI
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/retirement-tracking"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/action-items"] });
       toast({
         title: "Entry Deleted",
         description: "The tracking entry has been removed successfully.",
@@ -143,7 +144,9 @@ export default function RetirementTrackingItem({ tracking }: RetirementTrackingI
   const isOverdue = tracking.actionDeadline && new Date(tracking.actionDeadline) < new Date();
 
   return (
-    <div className={`p-6 rounded-lg border-2 ${
+    <div 
+        id={`tracking-${tracking.id}`}
+        className={`p-6 rounded-lg border-2 ${
       tracking.isActionRequired 
         ? isOverdue 
           ? "bg-red-50 border-red-300" 

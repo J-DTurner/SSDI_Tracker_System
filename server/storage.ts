@@ -1,6 +1,6 @@
 import { users, sections, documents, retirementTracking, googleIntegrations, contacts, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking, type GoogleIntegration, type InsertGoogleIntegration, type Contact, type InsertContact } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, gt, isNull, isNotNull } from "drizzle-orm";
 import { encrypt } from "./encryption";
 
 export interface IStorage {
@@ -28,6 +28,8 @@ export interface IStorage {
   createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking>;
   updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined>;
   deleteRetirementTracking(id: number): Promise<boolean>;
+  getActionItems(userId: number): Promise<{ needsAttention: any[], completed: any[] }>;
+  markRetirementTrackingAsComplete(id: number, userId: number): Promise<RetirementTracking | undefined>;
 
   // Google Integration operations
   getGoogleIntegration(userId: number): Promise<GoogleIntegration | undefined>;
@@ -93,6 +95,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDocumentsBySectionId(sectionId: number): Promise<Document[]> {
+    // This is a simplified check assuming USER_ID = 1 for now.
+    // A real implementation would pass userId in.
+    const section = await this.getSection(sectionId);
+    if (section?.userId !== 1) {
+      return [];
+    }
     return await db.select().from(documents).where(eq(documents.sectionId, sectionId));
   }
 
@@ -102,8 +110,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
+    const section = await this.getSection(document.sectionId);
+    if (!section) throw new Error("Section not found");
+    
     const documentToInsert = {
       ...document,
+      userId: section.userId,
       uploadedAt: document.status === 'uploaded' ? new Date() : null
     };
     
@@ -162,6 +174,104 @@ export class DatabaseStorage implements IStorage {
   async deleteRetirementTracking(id: number): Promise<boolean> {
     const result = await db.delete(retirementTracking).where(eq(retirementTracking.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  async getActionItems(userId: number): Promise<{ needsAttention: any[], completed: any[] }> {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    // 1. Get items needing attention
+    const missingDocs = await db.select({
+      type: 'missing_document',
+      id: documents.id,
+      title: documents.name,
+      description: sections.name,
+      sectionId: documents.sectionId,
+      sectionName: sections.name,
+      deadline: null,
+      isOverdue: false,
+    })
+    .from(documents)
+    .innerJoin(sections, eq(documents.sectionId, sections.id))
+    .where(and(eq(documents.status, 'missing'), eq(sections.userId, userId)));
+
+    const requiredActions = await db.select()
+    .from(retirementTracking)
+    .where(and(
+      eq(retirementTracking.userId, userId),
+      eq(retirementTracking.isActionRequired, true),
+      isNull(retirementTracking.actionCompletedAt)
+    ));
+    
+    const formattedRequiredActions = requiredActions.map(item => ({
+      type: 'required_action',
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      deadline: item.actionDeadline,
+      isOverdue: item.actionDeadline ? new Date(item.actionDeadline) < new Date() : false,
+    }));
+    
+    const needsAttention = [...missingDocs, ...formattedRequiredActions].sort((a, b) => {
+      if (a.isOverdue && !b.isOverdue) return -1;
+      if (!a.isOverdue && b.isOverdue) return 1;
+      if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      if (a.deadline && !b.deadline) return -1;
+      if (!a.deadline && b.deadline) return 1;
+      return 0;
+    });
+
+    // 2. Get completed items
+    const recentlyUploaded = await db.select({
+      type: 'completed_document',
+      id: documents.id,
+      title: documents.name,
+      completedAt: documents.uploadedAt
+    })
+    .from(documents)
+    .innerJoin(sections, eq(documents.sectionId, sections.id))
+    .where(and(
+      eq(documents.status, 'uploaded'),
+      eq(sections.userId, userId),
+      gt(documents.uploadedAt, sevenDaysAgo),
+      isNotNull(documents.uploadedAt)
+    ));
+    
+    const recentlyCompletedActions = await db.select({
+      type: 'completed_action',
+      id: retirementTracking.id,
+      title: retirementTracking.title,
+      completedAt: retirementTracking.actionCompletedAt
+    })
+    .from(retirementTracking)
+    .where(and(
+      eq(retirementTracking.userId, userId),
+      gt(retirementTracking.actionCompletedAt, sevenDaysAgo),
+      isNotNull(retirementTracking.actionCompletedAt)
+    ));
+
+    const completed = [...recentlyUploaded, ...recentlyCompletedActions]
+      .filter(item => item.completedAt)
+      .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
+
+    return { needsAttention, completed };
+  }
+
+  async markRetirementTrackingAsComplete(id: number, userId: number): Promise<RetirementTracking | undefined> {
+    const [item] = await db.select().from(retirementTracking).where(eq(retirementTracking.id, id));
+    if (!item || item.userId !== userId) {
+      return undefined; // Not found or not owned by user
+    }
+
+    const [updatedTracking] = await db
+      .update(retirementTracking)
+      .set({ 
+        isActionRequired: false,
+        actionCompletedAt: new Date()
+      })
+      .where(eq(retirementTracking.id, id))
+      .returning();
+    
+    return updatedTracking || undefined;
   }
 
   // Google Integration Methods

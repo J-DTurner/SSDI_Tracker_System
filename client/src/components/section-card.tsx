@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Section, Document } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,12 +10,20 @@ import { useToast } from "@/hooks/use-toast";
 
 interface SectionCardProps {
   section: Section;
+  triggerUpload?: boolean;
 }
 
-export default function SectionCard({ section }: SectionCardProps) {
+export default function SectionCard({ section, triggerUpload }: SectionCardProps) {
   const [showUpload, setShowUpload] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Effect to open uploader programmatically
+  useEffect(() => {
+    if (triggerUpload) {
+      setShowUpload(true);
+    }
+  }, [triggerUpload]);
 
   const { data: documents, isLoading } = useQuery<Document[]>({
     queryKey: [`/api/sections/${section.id}/documents`],
@@ -39,10 +47,11 @@ export default function SectionCard({ section }: SectionCardProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/sections/${section.id}/documents`] });
       queryClient.invalidateQueries({ queryKey: ["/api/sections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/action-items"] });
       setShowUpload(false);
       toast({
         title: "Document Uploaded",
-        description: "Your document has been successfully uploaded.",
+        description: "Your document has been successfully uploaded and the task is now complete.",
       });
     },
     onError: (error: Error) => {

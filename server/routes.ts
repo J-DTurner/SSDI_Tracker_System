@@ -93,6 +93,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/user/action-items", async (req, res) => {
+    try {
+      const actionItems = await storage.getActionItems(USER_ID);
+      res.json(actionItems);
+    } catch (error) {
+      console.error("Failed to get action items:", error);
+      res.status(500).json({ message: "Failed to get action items" });
+    }
+  });
 
   // --- USER & APPLICATION ROUTES ---
 
@@ -245,6 +254,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Retirement tracking entry deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete retirement tracking entry" });
+    }
+  });
+
+  app.patch("/api/retirement-tracking/:id/complete", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedTracking = await storage.markRetirementTrackingAsComplete(id, USER_ID);
+
+      if (!updatedTracking) {
+        return res.status(404).json({ message: "Tracking item not found or you do not have permission to update it." });
+      }
+
+      res.json(updatedTracking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark tracking item as complete." });
     }
   });
   

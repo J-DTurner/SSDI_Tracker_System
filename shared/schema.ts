@@ -26,6 +26,7 @@ export const users = pgTable("users", {
 
 export const usersRelations = relations(users, ({ many }) => ({
 	sections: many(sections),
+  documents: many(documents),
   retirementTrackings: many(retirementTracking),
   googleIntegrations: many(googleIntegrations),
   contacts: many(contacts),
@@ -124,6 +125,7 @@ export const documentCategoryEnum = pgEnum("document_category", ["personal", "me
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   sectionId: integer("section_id").notNull().references(() => sections.id, { onDelete: 'cascade' }),
+  userId: integer("user_id").notNull().references(() => users.id),
   name: varchar("name", { length: 256 }).notNull(),
   description: text("description"),
   fileName: text("file_name"),
@@ -139,6 +141,10 @@ export const documentsRelations = relations(documents, ({ one }) => ({
   section: one(sections, {
     fields: [documents.sectionId],
     references: [sections.id],
+  }),
+  user: one(users, {
+    fields: [documents.userId],
+    references: [users.id],
   }),
 }));
 
@@ -164,6 +170,7 @@ export const retirementTracking = pgTable("retirement_tracking", {
   priority: priorityEnum("priority").notNull(),
   isActionRequired: boolean("is_action_required").default(false).notNull(),
   actionDeadline: timestamp("action_deadline", { withTimezone: true }),
+  actionCompletedAt: timestamp("action_completed_at", { withTimezone: true }),
   notes: text("notes"),
   attachmentFileName: text("attachment_file_name"),
   attachmentFileSize: integer("attachment_file_size"),
