@@ -106,11 +106,12 @@ export default function SectionCard({ section }: SectionCardProps) {
     }
   };
 
-  const handleUpload = (file: File, documentData: { name: string; description: string; notes?: string }) => {
+  const handleUpload = (file: File, documentData: { name: string; description: string; notes?: string; category: string }) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('name', documentData.name);
     formData.append('description', documentData.description);
+    formData.append('category', documentData.category);
     if (documentData.notes) {
       formData.append('notes', documentData.notes);
     }

@@ -97,6 +97,17 @@ export default function DocumentItem({ document }: DocumentItemProps) {
     });
   };
 
+  const getCategoryLabel = (category: string) => {
+    const categoryMap: Record<string, { label: string; color: string }> = {
+      personal: { label: "Personal Records", color: "bg-blue-100 text-blue-800" },
+      medical: { label: "Medical Records", color: "bg-green-100 text-green-800" },
+      legal: { label: "Legal/Attorney", color: "bg-purple-100 text-purple-800" },
+      employment: { label: "Employment Records", color: "bg-orange-100 text-orange-800" },
+      government: { label: "Government Records", color: "bg-gray-100 text-gray-800" }
+    };
+    return categoryMap[category] || { label: category, color: "bg-gray-100 text-gray-800" };
+  };
+
   return (
     <div className={`flex items-center p-4 rounded-lg border ${getStatusColor()}`}>
       <div className="mr-4">
@@ -104,9 +115,16 @@ export default function DocumentItem({ document }: DocumentItemProps) {
       </div>
       
       <div className="flex-1">
-        <h4 className="text-ssdi-lg font-semibold text-ssdi-neutral">
-          {document.name}
-        </h4>
+        <div className="flex items-center gap-2 mb-2">
+          <h4 className="text-ssdi-lg font-semibold text-ssdi-neutral">
+            {document.name}
+          </h4>
+          {document.category && (
+            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getCategoryLabel(document.category).color}`}>
+              {getCategoryLabel(document.category).label}
+            </span>
+          )}
+        </div>
         <p className="text-ssdi-base text-gray-600 mb-1">
           {document.description}
         </p>

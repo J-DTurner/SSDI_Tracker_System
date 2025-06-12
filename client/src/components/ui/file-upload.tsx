@@ -190,6 +190,27 @@ export default function FileUpload({ onUpload, onCancel, isUploading, sectionNam
           {/* Document Information */}
           <div className="space-y-4">
             <div>
+              <Label htmlFor="category" className="text-ssdi-base font-semibold">
+                Document Category *
+              </Label>
+              <Select value={category} onValueChange={setCategory} required>
+                <SelectTrigger className="text-ssdi-base mt-1">
+                  <SelectValue placeholder="Choose who this document is for..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {getCategoryOptions().map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{option.label}</span>
+                        <span className="text-sm text-gray-600">{option.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label htmlFor="documentName" className="text-ssdi-base font-semibold">
                 Document Name *
               </Label>
@@ -237,7 +258,7 @@ export default function FileUpload({ onUpload, onCancel, isUploading, sectionNam
           <div className="flex gap-3 pt-4">
             <Button
               type="submit"
-              disabled={!selectedFile || !documentName || !description || isUploading}
+              disabled={!selectedFile || !documentName || !description || !category || isUploading}
               className="bg-ssdi-primary hover:bg-ssdi-primary-dark text-white px-6 py-2 text-ssdi-base font-semibold"
             >
               {isUploading ? (
