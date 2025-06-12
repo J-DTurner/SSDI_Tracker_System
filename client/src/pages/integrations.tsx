@@ -20,20 +20,26 @@ export default function IntegrationsPage() {
   // Check for status from OAuth callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('status') === 'success') {
+    const status = params.get('status');
+    const message = params.get('message'); // Get the detailed error message from the URL
+
+    if (status === 'success') {
       toast({
         title: "Connection Successful",
         description: "Your Google account has been connected.",
       });
+      // Invalidate query to refetch status and clean the URL
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/google"] });
-      setLocation('/integrations'); // Clean URL
-    } else if (params.get('status') === 'error') {
+      setLocation('/integrations'); 
+    } else if (status === 'error') {
       toast({
         title: "Connection Failed",
-        description: "Could not connect your Google account. Please try again.",
+        // Display the specific message from the backend, or a generic one if not provided.
+        description: message || "Could not connect your Google account. Please try again.",
         variant: "destructive",
       });
-      setLocation('/integrations'); // Clean URL
+      // Clean the URL
+      setLocation('/integrations');
     }
   }, [toast, queryClient, setLocation]);
 

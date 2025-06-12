@@ -1,12 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { googleAuthUrl, getTokensFromCode, getUserInfo, createCalendarEvent, sendEmail } from "./google";
+// Note the change from importing `googleAuthUrl` to `generateGoogleAuthUrl`
+import { generateGoogleAuthUrl, getTokensFromCode, getUserInfo, createCalendarEvent, sendEmail } from "./google";
 import { insertDocumentSchema, insertRetirementTrackingSchema, insertContactSchema } from "@shared/schema";
 import { setupAuth, requireAuth } from "./auth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto"; // Import the crypto module for generating the state token
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -38,14 +40,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Redirect to Google's OAuth consent screen
   app.get("/api/auth/google", (req, res) => {
-    res.redirect(googleAuthUrl);
+    // Generate a random state token for CSRF protection
+    const state = crypto.randomBytes(16).toString('hex');
+    
+    // The `express-session` middleware (configured in `setupAuth`) must be running for this to work.
+    // We store the state in the session to verify it on the callback.
+    if (req.session) {
+        req.session.oauth_state = state;
+    } else {
+        console.error("Session is not available. Ensure express-session middleware is configured correctly.");
+        return res.status(500).send("Session configuration error.");
+    }
+
+    // Generate the auth URL with the state token and redirect the user
+    const authUrl = generateGoogleAuthUrl(state);
+    res.redirect(authUrl);
   });
 
   // Handle the callback from Google
   app.get("/api/auth/google/callback", async (req, res) => {
     const code = req.query.code as string;
+    const state = req.query.state as string;
+    const storedState = req.session?.oauth_state;
+
+    // It's crucial to delete the state from the session after using it once.
+    if (req.session) {
+        delete req.session.oauth_state;
+    }
+
+    // 1. Validate the state parameter to prevent CSRF attacks.
+    if (!state || !storedState || state !== storedState) {
+        const errorMessage = "Invalid state parameter. This could be a sign of a CSRF attack or an expired session. Please try connecting again.";
+        console.error(errorMessage);
+        return res.redirect(`/integrations?status=error&message=${encodeURIComponent(errorMessage)}`);
+    }
+
     if (!code) {
-      return res.status(400).send("Authorization code missing.");
+      const errorMessage = "Authorization code missing from Google callback.";
+      console.error(errorMessage);
+      return res.redirect(`/integrations?status=error&message=${encodeURIComponent(errorMessage)}`);
     }
 
     try {
@@ -53,7 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userInfo = await getUserInfo(tokens);
       
       if (!tokens.access_token || !tokens.refresh_token || !tokens.expiry_date || !tokens.scope || !userInfo.email) {
-          throw new Error("Failed to retrieve complete token information.");
+          throw new Error("Failed to retrieve complete token information from Google.");
       }
       
       await storage.createOrUpdateGoogleIntegration({
@@ -68,7 +101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.redirect("/integrations?status=success");
     } catch (error) {
       console.error("Google auth callback error:", error);
-      res.redirect("/integrations?status=error");
+      const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred during Google authentication.";
+      res.redirect(`/integrations?status=error&message=${encodeURIComponent(errorMessage)}`);
     }
   });
   

@@ -6,20 +6,31 @@ import { Document } from '@shared/schema';
 import fs from 'fs';
 import path from 'path';
 
+// Add these checks at the top of the file
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+  throw new Error(
+    "Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI) must be set in your environment.",
+  );
+}
+
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI
 );
 
-export const googleAuthUrl = oauth2Client.generateAuthUrl({
-  access_type: 'offline',
-  scope: [
-    'https://www.googleapis.com/auth/calendar.events',
-    'https://www.googleapis.com/auth/gmail.send'
-  ],
-  prompt: 'consent',
-});
+// This is now a function that accepts a state parameter for CSRF protection.
+export function generateGoogleAuthUrl(state: string) {
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: [
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/gmail.send'
+    ],
+    prompt: 'consent',
+    state: state, // Include the state token in the auth URL
+  });
+}
 
 export async function getTokensFromCode(code: string) {
   const { tokens } = await oauth2Client.getToken(code);

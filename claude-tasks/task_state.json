@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-06-12T17:29:46.586890",
-  "current_task_index": 2,
-  "current_task_id": 2,
+  "timestamp": "2025-06-12T17:31:28.733267",
+  "current_task_index": -1,
+  "current_task_id": null,
   "project_directory": "C:\\Users\\Administrator\\Documents\\SSDI",
   "project_label": "SSDI",
   "all_tasks": [
@@ -22,7 +22,7 @@
     {
       "id": 2,
       "description": "We will update the login mutation to gracefully handle non-JSON error responses from the server.\n\n*   **File to Edit:** `C:\\Users\\Administrator\\Documents\\SSDI\\client\\src\\pages\\login.tsx`\n\n*   **Instructions:**\n    Locate the `loginMutation` and modify its `mutationFn`. We will add a `try...catch` block to handle cases where the error response from the server is not valid JSON.\n\n```typescript\n// ...\n  const loginMutation = useMutation({\n    mutationFn: async (credentials: { username: string; password: string }) => {\n      const response = await fetch(\"/api/login\", {\n        method: \"POST\",\n        headers: { \"Content-Type\": \"application/json\" },\n        body: JSON.stringify(credentials),\n      });\n      \n      if (!response.ok) {\n        let errorMessage = \"An unknown error occurred during login.\";\n        try {\n          const errorData = await response.json();\n          errorMessage = errorData.message || \"Login failed.\";\n        } catch (e) {\n          errorMessage = \"The server returned an unexpected response. Please try again later.\";\n          console.error(\"Failed to parse login error response as JSON. Status:\", response.status);\n        }\n        throw new Error(errorMessage);\n      }\n      \n      return response.json();\n    },\n    onSuccess: () => {\n// ...\n```\n\n*   **Summary of Change:**\n    The updated `mutationFn` now attempts to parse an error response as JSON. If that fails (e.g., the response is HTML), it throws a generic, user-friendly error message instead of crashing or displaying a raw parsing error. This makes the login process more robust.",
-      "status": "Running",
+      "status": "Completed",
       "filepath": "C:\\Users\\Administrator\\Documents\\SSDI\\claude-tasks\\tasks\\task_2.md",
       "error_details": null
     }
