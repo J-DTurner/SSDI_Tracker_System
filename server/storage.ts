@@ -1,4 +1,4 @@
-import { users, sections, documents, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument } from "@shared/schema";
+import { users, sections, documents, retirementTracking, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking } from "@shared/schema";
 
 export interface IStorage {
   // User operations
@@ -18,26 +18,75 @@ export interface IStorage {
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined>;
   deleteDocument(id: number): Promise<boolean>;
+
+  // Retirement tracking operations
+  getRetirementTrackingByUserId(userId: number): Promise<RetirementTracking[]>;
+  getRetirementTracking(id: number): Promise<RetirementTracking | undefined>;
+  createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking>;
+  updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined>;
+  deleteRetirementTracking(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private sections: Map<number, Section>;
   private documents: Map<number, Document>;
+  private retirementTrackings: Map<number, RetirementTracking>;
   private currentUserId: number;
   private currentSectionId: number;
   private currentDocumentId: number;
+  private currentRetirementTrackingId: number;
 
   constructor() {
     this.users = new Map();
     this.sections = new Map();
     this.documents = new Map();
+    this.retirementTrackings = new Map();
     this.currentUserId = 1;
     this.currentSectionId = 1;
     this.currentDocumentId = 1;
+    this.currentRetirementTrackingId = 1;
     
     // Initialize with sample user and sections
     this.initializeSampleData();
+  }
+
+  // Retirement tracking operations
+  async getRetirementTrackingByUserId(userId: number): Promise<RetirementTracking[]> {
+    return Array.from(this.retirementTrackings.values())
+      .filter(tracking => tracking.userId === userId)
+      .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+  }
+
+  async getRetirementTracking(id: number): Promise<RetirementTracking | undefined> {
+    return this.retirementTrackings.get(id);
+  }
+
+  async createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking> {
+    const id = this.currentRetirementTrackingId++;
+    const newTracking: RetirementTracking = {
+      ...tracking,
+      id,
+      attachmentFileName: tracking.attachmentFileName || null,
+      attachmentFileSize: tracking.attachmentFileSize || null,
+      actionDeadline: tracking.actionDeadline || null,
+      notes: tracking.notes || null,
+    };
+    this.retirementTrackings.set(id, newTracking);
+    return newTracking;
+  }
+
+  async updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined> {
+    const existing = this.retirementTrackings.get(id);
+    if (!existing) return undefined;
+    
+    const updatedTracking = { ...existing, ...tracking };
+    this.retirementTrackings.set(id, updatedTracking);
+    return updatedTracking;
+  }
+
+  async deleteRetirementTracking(id: number): Promise<boolean> {
+    return this.retirementTrackings.delete(id);
   }
 
   private async initializeSampleData() {
@@ -173,6 +222,57 @@ export class MemStorage implements IStorage {
         });
       }
     }
+
+    // Create sample retirement tracking entries
+    await this.createRetirementTracking({
+      userId: user.id,
+      type: "email",
+      title: "Early Retirement Application Received",
+      description: "Confirmation that your early retirement application has been received and is being processed",
+      receivedAt: new Date("2024-01-15T10:30:00Z"),
+      source: "ssa_gov",
+      priority: "medium",
+      isActionRequired: false,
+      notes: "Application reference: ER-2024-001234"
+    });
+
+    await this.createRetirementTracking({
+      userId: user.id,
+      type: "letter",
+      title: "Request for Additional Documentation",
+      description: "Social Security Administration requesting additional employment verification documents",
+      receivedAt: new Date("2024-02-01T14:00:00Z"),
+      source: "mail",
+      priority: "high",
+      isActionRequired: true,
+      actionDeadline: new Date("2024-03-01T23:59:59Z"),
+      notes: "Need to provide W-2 forms from 2019-2023 and employment verification letter"
+    });
+
+    await this.createRetirementTracking({
+      userId: user.id,
+      type: "phone_call",
+      title: "Status Update Call",
+      description: "Called SSA to check on application status - told processing is taking 3-4 months",
+      receivedAt: new Date("2024-02-15T11:15:00Z"),
+      source: "phone",
+      priority: "low",
+      isActionRequired: false,
+      notes: "Spoke with representative Sarah Johnson. Case number: ER-2024-001234. Expected decision by April 2024."
+    });
+
+    await this.createRetirementTracking({
+      userId: user.id,
+      type: "deadline",
+      title: "Medical Exam Appointment",
+      description: "Scheduled medical examination required for early retirement application",
+      receivedAt: new Date("2024-02-20T09:00:00Z"),
+      source: "social_security",
+      priority: "high",
+      isActionRequired: true,
+      actionDeadline: new Date("2024-03-15T14:00:00Z"),
+      notes: "Appointment with Dr. Wilson at Downtown Medical Center. Bring ID and insurance cards."
+    });
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -255,6 +355,43 @@ export class MemStorage implements IStorage {
 
   async deleteDocument(id: number): Promise<boolean> {
     return this.documents.delete(id);
+  }
+
+  async getRetirementTrackingByUserId(userId: number): Promise<RetirementTracking[]> {
+    return Array.from(this.retirementTrackings.values())
+      .filter(tracking => tracking.userId === userId)
+      .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+  }
+
+  async getRetirementTracking(id: number): Promise<RetirementTracking | undefined> {
+    return this.retirementTrackings.get(id);
+  }
+
+  async createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking> {
+    const id = this.currentRetirementTrackingId++;
+    const newTracking: RetirementTracking = {
+      ...tracking,
+      id,
+      attachmentFileName: tracking.attachmentFileName || null,
+      attachmentFileSize: tracking.attachmentFileSize || null,
+      actionDeadline: tracking.actionDeadline || null,
+      notes: tracking.notes || null,
+    };
+    this.retirementTrackings.set(id, newTracking);
+    return newTracking;
+  }
+
+  async updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined> {
+    const existing = this.retirementTrackings.get(id);
+    if (!existing) return undefined;
+    
+    const updatedTracking = { ...existing, ...tracking };
+    this.retirementTrackings.set(id, updatedTracking);
+    return updatedTracking;
+  }
+
+  async deleteRetirementTracking(id: number): Promise<boolean> {
+    return this.retirementTrackings.delete(id);
   }
 }
 
