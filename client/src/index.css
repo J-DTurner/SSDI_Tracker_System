@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(222, 84%, 4.9%);
+  --muted: hsl(210, 40%, 96%);
+  --muted-foreground: hsl(215.4, 16.3%, 46.9%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(222, 84%, 4.9%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(222, 84%, 4.9%);
+  --border: hsl(214.3, 31.8%, 91.4%);
+  --input: hsl(214.3, 31.8%, 91.4%);
+  --primary: hsl(222, 47%, 37%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(210, 40%, 96%);
+  --secondary-foreground: hsl(222, 84%, 4.9%);
+  --accent: hsl(210, 40%, 96%);
+  --accent-foreground: hsl(222, 84%, 4.9%);
+  --destructive: hsl(0, 84%, 37%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(222, 84%, 4.9%);
+  --radius: 0.75rem;
+  
+  /* Custom SSDI App Colors */
+  --ssdi-primary: hsl(222, 47%, 37%);
+  --ssdi-success: hsl(160, 84%, 39%);
+  --ssdi-warning: hsl(32, 95%, 44%);
+  --ssdi-danger: hsl(0, 84%, 37%);
+  --ssdi-neutral: hsl(215, 25%, 27%);
+  --ssdi-light-bg: hsl(210, 20%, 98%);
+}
+
+.dark {
+  --background: hsl(222, 84%, 4.9%);
+  --foreground: hsl(210, 40%, 98%);
+  --muted: hsl(217, 32%, 17%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --popover: hsl(222, 84%, 4.9%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsl(222, 84%, 4.9%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(217, 32%, 17%);
+  --input: hsl(217, 32%, 17%);
+  --primary: hsl(210, 40%, 98%);
+  --primary-foreground: hsl(222, 84%, 4.9%);
+  --secondary: hsl(217, 32%, 17%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --accent: hsl(217, 32%, 17%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 62%, 30%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(212, 12%, 77%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    background-color: var(--ssdi-light-bg);
+    color: var(--ssdi-neutral);
+    font-size: 18px;
+    line-height: 1.6;
+  }
+
+  /* Large, accessible text sizing */
+  .text-ssdi-base { font-size: 18px; }
+  .text-ssdi-lg { font-size: 20px; }
+  .text-ssdi-xl { font-size: 22px; }
+  .text-ssdi-2xl { font-size: 26px; }
+  .text-ssdi-3xl { font-size: 30px; }
+  .text-ssdi-4xl { font-size: 36px; }
+
+  /* Custom SSDI color classes */
+  .bg-ssdi-primary { background-color: var(--ssdi-primary); }
+  .bg-ssdi-success { background-color: var(--ssdi-success); }
+  .bg-ssdi-warning { background-color: var(--ssdi-warning); }
+  .bg-ssdi-danger { background-color: var(--ssdi-danger); }
+  .bg-ssdi-neutral { background-color: var(--ssdi-neutral); }
+  .bg-ssdi-light { background-color: var(--ssdi-light-bg); }
+
+  .text-ssdi-primary { color: var(--ssdi-primary); }
+  .text-ssdi-success { color: var(--ssdi-success); }
+  .text-ssdi-warning { color: var(--ssdi-warning); }
+  .text-ssdi-danger { color: var(--ssdi-danger); }
+  .text-ssdi-neutral { color: var(--ssdi-neutral); }
+
+  .border-ssdi-success { border-color: var(--ssdi-success); }
+  .border-ssdi-warning { border-color: var(--ssdi-warning); }
+  .border-ssdi-danger { border-color: var(--ssdi-danger); }
+
+  /* Hover states for accessibility */
+  .hover\:bg-ssdi-primary-dark:hover { background-color: hsl(222, 47%, 32%); }
+  .hover\:bg-ssdi-success-dark:hover { background-color: hsl(160, 84%, 34%); }
+  .hover\:bg-ssdi-warning-dark:hover { background-color: hsl(32, 95%, 39%); }
+  .hover\:bg-ssdi-danger-dark:hover { background-color: hsl(0, 84%, 32%); }
+
+  /* Focus states for accessibility */
+  .focus\:ring-ssdi-primary:focus { --tw-ring-color: var(--ssdi-primary); }
+  .focus\:ring-ssdi-success:focus { --tw-ring-color: var(--ssdi-success); }
+  .focus\:ring-ssdi-warning:focus { --tw-ring-color: var(--ssdi-warning); }
+  .focus\:ring-ssdi-danger:focus { --tw-ring-color: var(--ssdi-danger); }
+}
+
+/* Custom animations for better UX */
+@keyframes bounce-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 0.3s ease-in-out;
+}
+
+/* File upload styles */
+.upload-zone {
+  transition: all 0.3s ease;
+}
+
+.upload-zone:hover {
+  transform: translateY(-1px);
+}
+
+.upload-zone.drag-over {
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
