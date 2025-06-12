@@ -32,6 +32,8 @@ const upload = multer({
 const USER_ID = 1; // For demo purposes, all operations are for user ID 1
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  await setupAuth(app);
+  
   // --- GOOGLE INTEGRATION ROUTES ---
 
   // Redirect to Google's OAuth consent screen

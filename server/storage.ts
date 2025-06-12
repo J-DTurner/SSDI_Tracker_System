@@ -358,7 +358,7 @@ export class DatabaseStorage implements IStorage {
 
     // Create sample user
     const user = await this.createUser({
-      username: "john.smith",
+      username: "demo_user",
       password: "password",
       name: "John Smith",
       applicationId: "SS-2024-001234"

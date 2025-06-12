@@ -22,8 +22,15 @@ export default function LoginPage() {
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
+        let errorMessage = "An unknown error occurred during login.";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || "Login failed.";
+        } catch (e) {
+          errorMessage = "The server returned an unexpected response. Please try again later.";
+          console.error("Failed to parse login error response as JSON. Status:", response.status);
+        }
+        throw new Error(errorMessage);
       }
       
       return response.json();
