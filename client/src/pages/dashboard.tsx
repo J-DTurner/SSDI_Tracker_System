@@ -26,6 +26,14 @@ export default function Dashboard() {
     sectionRefs.current = sections.map(() => createRef<HTMLDivElement>());
   }
 
+  useEffect(() => {
+    if (uploaderToOpen) {
+      // Reset the state after a short delay to allow re-triggering
+      const timer = setTimeout(() => setUploaderToOpen(null), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploaderToOpen]);
+
   if (userLoading || sectionsLoading) {
     return (
       <div className="min-h-screen bg-ssdi-light flex items-center justify-center">
@@ -62,14 +70,6 @@ export default function Dashboard() {
       setUploaderToOpen(sectionId);
     }
   };
-
-  useEffect(() => {
-    if (uploaderToOpen) {
-      // Reset the state after a short delay to allow re-triggering
-      const timer = setTimeout(() => setUploaderToOpen(null), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [uploaderToOpen]);
 
   return (
     <div className="min-h-screen bg-ssdi-light">

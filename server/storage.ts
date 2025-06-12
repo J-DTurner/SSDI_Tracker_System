@@ -1,13 +1,14 @@
-import { users, sections, documents, retirementTracking, googleIntegrations, contacts, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking, type GoogleIntegration, type InsertGoogleIntegration, type Contact, type InsertContact } from "@shared/schema";
+import { users, sections, documents, retirementTracking, googleIntegrations, contacts, type User, type InsertUser, type UpsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking, type GoogleIntegration, type InsertGoogleIntegration, type Contact, type InsertContact } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gt, isNull, isNotNull } from "drizzle-orm";
 import { encrypt } from "./encryption";
 
 export interface IStorage {
   // User operations
-  getUser(id: number): Promise<User | undefined>;
+  getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
   
   // Section operations
   getSectionsByUserId(userId: number): Promise<Section[]>;
@@ -50,7 +51,7 @@ export class DatabaseStorage implements IStorage {
     this.initializeSampleData();
   }
 
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
@@ -64,6 +65,21 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .insert(users)
       .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
       .returning();
     return user;
   }

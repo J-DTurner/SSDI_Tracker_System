@@ -2,11 +2,12 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
-const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_SECRET!, 'utf-8');
 
 if (!process.env.ENCRYPTION_SECRET || process.env.ENCRYPTION_SECRET.length !== 32) {
   throw new Error('ENCRYPTION_SECRET must be set and be 32 characters long.');
 }
+
+const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_SECRET!, 'utf-8');
 
 export function encrypt(text: string): string {
   const iv = crypto.randomBytes(IV_LENGTH);

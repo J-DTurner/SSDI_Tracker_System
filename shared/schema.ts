@@ -15,17 +15,35 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
-// USER
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// USER - Updated for Replit Auth
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: varchar("username", { length: 256 }).unique().notNull(),
-  password: text("password").notNull(),
+  id: varchar("id").primaryKey().notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  // Keep legacy fields for existing functionality
+  username: varchar("username", { length: 256 }).unique(),
+  password: text("password"),
   name: varchar("name", { length: 256 }),
-  applicationId: varchar("applicationId", { length: 256 }),
+  applicationId: varchar("application_id", { length: 256 }),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
-	sections: many(sections),
+        sections: many(sections),
   documents: many(documents),
   retirementTrackings: many(retirementTracking),
   googleIntegrations: many(googleIntegrations),
@@ -34,6 +52,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type UpsertUser = typeof users.$inferInsert;
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 
