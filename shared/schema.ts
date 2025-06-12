@@ -26,20 +26,17 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// USER - Updated for Replit Auth
+// USER - Keep existing structure and add Replit Auth fields
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  // Keep legacy fields for existing functionality
-  username: varchar("username", { length: 256 }).unique(),
-  password: text("password"),
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 256 }).unique().notNull(),
+  password: text("password").notNull(),
   name: varchar("name", { length: 256 }),
   applicationId: varchar("application_id", { length: 256 }),
+  // Auth fields
+  email: varchar("email"),
+  createdAt: timestamp("createdat").defaultNow(),
+  updatedAt: timestamp("updatedat").defaultNow(),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({

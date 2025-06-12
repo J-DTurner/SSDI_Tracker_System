@@ -5,10 +5,9 @@ import { encrypt } from "./encryption";
 
 export interface IStorage {
   // User operations
-  getUser(id: string): Promise<User | undefined>;
+  getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  upsertUser(user: UpsertUser): Promise<User>;
   
   // Section operations
   getSectionsByUserId(userId: number): Promise<Section[]>;
@@ -51,8 +50,13 @@ export class DatabaseStorage implements IStorage {
     this.initializeSampleData();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
+  async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByReplitId(replitUserId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.replitUserId, replitUserId));
     return user || undefined;
   }
 
@@ -69,19 +73,31 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
+  async upsertUserByReplitId(replitUserId: string, userData: Partial<InsertUser>): Promise<User> {
+    const existingUser = await this.getUserByReplitId(replitUserId);
+    
+    if (existingUser) {
+      const [user] = await db
+        .update(users)
+        .set({
           ...userData,
           updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+        })
+        .where(eq(users.replitUserId, replitUserId))
+        .returning();
+      return user;
+    } else {
+      const [user] = await db
+        .insert(users)
+        .values({
+          replitUserId,
+          username: userData.email || `user_${replitUserId}`,
+          password: 'replit_auth',
+          ...userData,
+        })
+        .returning();
+      return user;
+    }
   }
 
   async getSectionsByUserId(userId: number): Promise<Section[]> {
