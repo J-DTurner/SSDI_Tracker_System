@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, X, FileText } from "lucide-react";
 
 interface FileUploadProps {
-  onUpload: (file: File, data: { name: string; description: string; notes?: string }) => void;
+  onUpload: (file: File, data: { name: string; description: string; notes?: string; category: string }) => void;
   onCancel: () => void;
   isUploading: boolean;
   sectionName: string;
@@ -18,8 +19,40 @@ export default function FileUpload({ onUpload, onCancel, isUploading, sectionNam
   const [documentName, setDocumentName] = useState("");
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
+  const [category, setCategory] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get category options based on section
+  const getCategoryOptions = () => {
+    if (sectionName === "Medical Evidence") {
+      return [
+        { value: "medical", label: "For Medical Providers", description: "Records from doctors, hospitals, clinics" },
+        { value: "personal", label: "Personal Medical Records", description: "Your own medical documentation" },
+        { value: "legal", label: "For Legal Representative", description: "Medical records for your lawyer" }
+      ];
+    } else if (sectionName === "Appeals Process Documents") {
+      return [
+        { value: "legal", label: "For Legal Representative", description: "Documents for your lawyer or advocate" },
+        { value: "government", label: "For Social Security", description: "Official appeals documents" },
+        { value: "personal", label: "Personal Records", description: "Your own appeal documentation" }
+      ];
+    } else if (sectionName === "Work History Documentation") {
+      return [
+        { value: "employment", label: "From Employers", description: "Records from current/former employers" },
+        { value: "personal", label: "Personal Work Records", description: "Your own employment documentation" },
+        { value: "legal", label: "For Legal Representative", description: "Work records for your lawyer" }
+      ];
+    } else {
+      return [
+        { value: "government", label: "Government Records", description: "Official documents from agencies" },
+        { value: "personal", label: "Personal Documents", description: "Your own records and documentation" },
+        { value: "legal", label: "For Legal Representative", description: "Documents for your lawyer" },
+        { value: "medical", label: "Medical Records", description: "Health-related documentation" },
+        { value: "employment", label: "Employment Records", description: "Work-related documentation" }
+      ];
+    }
+  };
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -60,7 +93,7 @@ export default function FileUpload({ onUpload, onCancel, isUploading, sectionNam
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedFile || !documentName || !description) {
+    if (!selectedFile || !documentName || !description || !category) {
       return;
     }
 
@@ -68,6 +101,7 @@ export default function FileUpload({ onUpload, onCancel, isUploading, sectionNam
       name: documentName,
       description: description,
       notes: notes || undefined,
+      category: category,
     });
   };
 

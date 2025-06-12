@@ -93,7 +93,8 @@ export class MemStorage implements IStorage {
           fileName: "birth_certificate.pdf",
           fileSize: 2048000,
           status: "uploaded",
-          notes: "Official copy from vital records office"
+          notes: "Official copy from vital records office",
+          category: "government"
         });
         
         await this.createDocument({
@@ -103,7 +104,8 @@ export class MemStorage implements IStorage {
           fileName: "w2_forms_2022_2023.pdf",
           fileSize: 1536000,
           status: "uploaded",
-          notes: "Forms from ABC Manufacturing"
+          notes: "Forms from ABC Manufacturing",
+          category: "employment"
         });
         
         await this.createDocument({
@@ -113,7 +115,8 @@ export class MemStorage implements IStorage {
           fileName: "tax_returns_2022_2023.pdf",
           fileSize: 3072000,
           status: "uploaded",
-          notes: "Filed jointly with spouse"
+          notes: "Filed jointly with spouse",
+          category: "personal"
         });
       } else if (section.name === "Medical Evidence") {
         await this.createDocument({
@@ -124,7 +127,8 @@ export class MemStorage implements IStorage {
           fileSize: 4096000,
           status: "uploaded",
           contactInfo: "Dr. Johnson's office - (555) 123-4567",
-          notes: "Records from 2022-2024"
+          notes: "Records from 2022-2024",
+          category: "medical"
         });
         
         await this.createDocument({
@@ -133,7 +137,8 @@ export class MemStorage implements IStorage {
           description: "Reports from specialists who treated your condition",
           status: "missing",
           contactInfo: "Dr. Martinez's office - (555) 123-4567",
-          notes: "Need orthopedic specialist reports"
+          notes: "Need orthopedic specialist reports",
+          category: "medical"
         });
       } else if (section.name === "Work History Documentation") {
         await this.createDocument({
@@ -143,7 +148,8 @@ export class MemStorage implements IStorage {
           fileName: "abc_employment_records.pdf",
           fileSize: 1024000,
           status: "uploaded",
-          notes: "HR department provided complete records"
+          notes: "HR department provided complete records",
+          category: "employment"
         });
         
         await this.createDocument({
@@ -153,7 +159,8 @@ export class MemStorage implements IStorage {
           fileName: "job_descriptions.pdf",
           fileSize: 512000,
           status: "uploaded",
-          notes: "Includes physical demands analysis"
+          notes: "Includes physical demands analysis",
+          category: "employment"
         });
       } else if (section.name === "Appeals Process Documents") {
         await this.createDocument({
@@ -161,7 +168,8 @@ export class MemStorage implements IStorage {
           name: "Denial Letter",
           description: "Official denial letter explaining why your application was rejected",
           status: "missing",
-          notes: "Required to start appeal process - deadline May 15, 2024"
+          notes: "Required to start appeal process - deadline May 15, 2024",
+          category: "legal"
         });
       }
     }
@@ -222,6 +230,10 @@ export class MemStorage implements IStorage {
     const newDocument: Document = { 
       ...document, 
       id,
+      fileName: document.fileName || null,
+      fileSize: document.fileSize || null,
+      contactInfo: document.contactInfo || null,
+      notes: document.notes || null,
       uploadedAt: document.status === 'uploaded' ? new Date() : null
     };
     this.documents.set(id, newDocument);

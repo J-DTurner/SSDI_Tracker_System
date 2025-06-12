@@ -30,6 +30,7 @@ export const documents = pgTable("documents", {
   status: text("status").notNull(), // 'uploaded', 'missing', 'pending'
   contactInfo: text("contact_info"),
   notes: text("notes"),
+  category: text("category").notNull(), // 'personal', 'medical', 'legal', 'employment', 'government'
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({

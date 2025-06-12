@@ -66,21 +66,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sections/:sectionId/documents", upload.single('file'), async (req, res) => {
     try {
       const sectionId = parseInt(req.params.sectionId);
-      const { name, description, notes } = req.body;
+      const { name, description, notes, category } = req.body;
       
-      if (!name || !description) {
-        return res.status(400).json({ message: "Name and description are required" });
+      if (!name || !description || !category) {
+        return res.status(400).json({ message: "Name, description, and category are required" });
       }
 
       const documentData = {
         sectionId,
         name,
         description,
-        fileName: req.file?.filename,
-        fileSize: req.file?.size,
+        fileName: req.file?.filename || null,
+        fileSize: req.file?.size || null,
         status: req.file ? 'uploaded' : 'pending',
         notes: notes || null,
-        contactInfo: null
+        contactInfo: null,
+        category
       };
 
       const document = await storage.createDocument(documentData);
