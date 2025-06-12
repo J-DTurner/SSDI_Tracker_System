@@ -34,13 +34,21 @@ export default function RetirementTrackingPage() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/retirement-tracking"] });
       setShowAddForm(false);
       toast({
         title: "Entry Added",
         description: "Your retirement tracking entry has been successfully added.",
       });
+
+      if (data.calendarEventCreated) {
+        toast({
+            title: "Calendar Event Created",
+            description: "An event was automatically added to your Google Calendar.",
+            className: "bg-blue-50 border-blue-200 text-blue-800"
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -149,7 +157,7 @@ export default function RetirementTrackingPage() {
           ))}
         </div>
 
-        {trackings?.length === 0 && (
+        {trackings?.length === 0 && !showAddForm && (
           <Card className="bg-white shadow-lg border border-gray-200">
             <CardContent className="p-8 text-center">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />

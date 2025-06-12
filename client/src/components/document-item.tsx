@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Document } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertTriangle, Eye, Trash2 } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, Eye, Trash2, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import EmailComposer from "./email-composer";
 
 interface DocumentItemProps {
   document: Document;
 }
 
 export default function DocumentItem({ document }: DocumentItemProps) {
+  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -78,7 +81,7 @@ export default function DocumentItem({ document }: DocumentItemProps) {
     }
   };
 
-  const formatFileSize = (bytes?: number) => {
+  const formatFileSize = (bytes?: number | null) => {
     if (!bytes) return "";
     const kb = bytes / 1024;
     const mb = kb / 1024;
@@ -109,70 +112,90 @@ export default function DocumentItem({ document }: DocumentItemProps) {
   };
 
   return (
-    <div className={`flex items-center p-4 rounded-lg border ${getStatusColor()}`}>
-      <div className="mr-4">
-        {getStatusIcon()}
-      </div>
-      
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <h4 className="text-ssdi-lg font-semibold text-ssdi-neutral">
-            {document.name}
-          </h4>
-          {document.category && (
-            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getCategoryLabel(document.category).color}`}>
-              {getCategoryLabel(document.category).label}
-            </span>
+    <>
+      <div className={`flex items-center p-4 rounded-lg border ${getStatusColor()}`}>
+        <div className="mr-4">
+          {getStatusIcon()}
+        </div>
+        
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-ssdi-lg font-semibold text-ssdi-neutral">
+              {document.name}
+            </h4>
+            {document.category && (
+              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getCategoryLabel(document.category).color}`}>
+                {getCategoryLabel(document.category).label}
+              </span>
+            )}
+          </div>
+          <p className="text-ssdi-base text-gray-600 mb-1">
+            {document.description}
+          </p>
+          
+          {document.uploadedAt && (
+            <p className="text-sm text-gray-500">
+              Uploaded: {formatDate(document.uploadedAt)}
+              {document.fileSize && ` • ${formatFileSize(document.fileSize)}`}
+            </p>
+          )}
+          
+          {document.contactInfo && (
+            <p className="text-sm text-gray-500 mt-1">
+              Contact: {document.contactInfo}
+            </p>
+          )}
+          
+          {document.notes && (
+            <p className="text-sm text-gray-600 mt-1 italic">
+              {document.notes}
+            </p>
           )}
         </div>
-        <p className="text-ssdi-base text-gray-600 mb-1">
-          {document.description}
-        </p>
-        
-        {document.uploadedAt && (
-          <p className="text-sm text-gray-500">
-            Uploaded: {formatDate(document.uploadedAt)}
-            {document.fileSize && ` • ${formatFileSize(document.fileSize)}`}
-          </p>
-        )}
-        
-        {document.contactInfo && (
-          <p className="text-sm text-gray-500 mt-1">
-            Contact: {document.contactInfo}
-          </p>
-        )}
-        
-        {document.notes && (
-          <p className="text-sm text-gray-600 mt-1 italic">
-            {document.notes}
-          </p>
-        )}
-      </div>
 
-      <div className="flex gap-2">
-        {document.status === "uploaded" && document.fileName && (
+        <div className="flex gap-2">
+          {document.status === "uploaded" && document.fileName && (
+            <>
+              <Button
+                onClick={handleView}
+                variant="outline"
+                size="sm"
+                className="text-ssdi-base font-medium"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View
+              </Button>
+              <Button
+                onClick={() => setIsEmailComposerOpen(true)}
+                variant="outline"
+                size="sm"
+                className="text-ssdi-base font-medium text-ssdi-primary border-ssdi-primary hover:bg-blue-50"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Email
+              </Button>
+            </>
+          )}
+          
           <Button
-            onClick={handleView}
+            onClick={handleDelete}
             variant="outline"
             size="sm"
-            className="text-ssdi-base font-medium"
+            className="text-ssdi-danger border-ssdi-danger hover:bg-red-50"
+            disabled={deleteMutation.isPending}
           >
-            <Eye className="w-4 h-4 mr-2" />
-            View
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
           </Button>
-        )}
-        
-        <Button
-          onClick={handleDelete}
-          variant="outline"
-          size="sm"
-          className="text-ssdi-danger border-ssdi-danger hover:bg-red-50"
-          disabled={deleteMutation.isPending}
-        >
-          <Trash2 className="w-4 h-4 mr-2" />
-          Delete
-        </Button>
+        </div>
       </div>
-    </div>
+      {isEmailComposerOpen && (
+        <EmailComposer
+          isOpen={isEmailComposerOpen}
+          onOpenChange={setIsEmailComposerOpen}
+          initialDocument={document}
+        />
+      )}
+    </>
   );
 }

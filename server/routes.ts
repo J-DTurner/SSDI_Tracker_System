@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDocumentSchema, insertRetirementTrackingSchema } from "@shared/schema";
+import { googleAuthUrl, getTokensFromCode, getUserInfo, createCalendarEvent, sendEmail } from "./google";
+import { insertDocumentSchema, insertRetirementTrackingSchema, insertContactSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -18,20 +19,86 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (allowedTypes.includes(file.mimetype)) {
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only PDF, JPG, and PNG files are allowed.'));
+      cb(new Error('Invalid file type. Only PDF, JPG, PNG, and Word files are allowed.'));
     }
   }
 });
 
+const USER_ID = 1; // For demo purposes, all operations are for user ID 1
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Get current user (for demo, always return user ID 1)
+  // --- GOOGLE INTEGRATION ROUTES ---
+
+  // Redirect to Google's OAuth consent screen
+  app.get("/api/auth/google", (req, res) => {
+    res.redirect(googleAuthUrl);
+  });
+
+  // Handle the callback from Google
+  app.get("/api/auth/google/callback", async (req, res) => {
+    const code = req.query.code as string;
+    if (!code) {
+      return res.status(400).send("Authorization code missing.");
+    }
+
+    try {
+      const tokens = await getTokensFromCode(code);
+      const userInfo = await getUserInfo(tokens);
+      
+      if (!tokens.access_token || !tokens.refresh_token || !tokens.expiry_date || !tokens.scope || !userInfo.email) {
+          throw new Error("Failed to retrieve complete token information.");
+      }
+      
+      await storage.createOrUpdateGoogleIntegration({
+        userId: USER_ID,
+        email: userInfo.email,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiryDate: new Date(tokens.expiry_date),
+        scopes: tokens.scope,
+      });
+
+      res.redirect("/integrations?status=success");
+    } catch (error) {
+      console.error("Google auth callback error:", error);
+      res.redirect("/integrations?status=error");
+    }
+  });
+  
+  // Get Google integration status
+  app.get("/api/integrations/google", async (req, res) => {
+    try {
+      const integration = await storage.getGoogleIntegration(USER_ID);
+      if (integration) {
+        res.json({ isConnected: true, email: integration.email });
+      } else {
+        res.json({ isConnected: false });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get integration status" });
+    }
+  });
+
+  // Disconnect Google account
+  app.delete("/api/integrations/google", async (req, res) => {
+    try {
+      await storage.deleteGoogleIntegration(USER_ID);
+      res.json({ message: "Google account disconnected successfully." });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to disconnect Google account." });
+    }
+  });
+
+
+  // --- USER & APPLICATION ROUTES ---
+
   app.get("/api/user", async (req, res) => {
     try {
-      const user = await storage.getUser(1);
+      const user = await storage.getUser(USER_ID);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -41,17 +108,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all sections for current user
   app.get("/api/sections", async (req, res) => {
     try {
-      const sections = await storage.getSectionsByUserId(1);
+      const sections = await storage.getSectionsByUserId(USER_ID);
       res.json(sections);
     } catch (error) {
       res.status(500).json({ message: "Failed to get sections" });
     }
   });
 
-  // Get documents for a specific section
   app.get("/api/sections/:sectionId/documents", async (req, res) => {
     try {
       const sectionId = parseInt(req.params.sectionId);
@@ -62,7 +127,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload document
   app.post("/api/sections/:sectionId/documents", upload.single('file'), async (req, res) => {
     try {
       const sectionId = parseInt(req.params.sectionId);
@@ -91,24 +155,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update document
-  app.patch("/api/documents/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updates = req.body;
-      
-      const document = await storage.updateDocument(id, updates);
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-      
-      res.json(document);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update document" });
-    }
-  });
-
-  // Delete document
   app.delete("/api/documents/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -124,38 +170,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update section status
-  app.patch("/api/sections/:id/status", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { status } = req.body;
-      
-      if (!status) {
-        return res.status(400).json({ message: "Status is required" });
-      }
-      
-      const section = await storage.updateSectionStatus(id, status);
-      if (!section) {
-        return res.status(404).json({ message: "Section not found" });
-      }
-      
-      res.json(section);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update section status" });
-    }
-  });
+  // --- RETIREMENT TRACKING ROUTES ---
 
-  // Get retirement tracking entries for current user
   app.get("/api/retirement-tracking", async (req, res) => {
     try {
-      const trackings = await storage.getRetirementTrackingByUserId(1);
+      const trackings = await storage.getRetirementTrackingByUserId(USER_ID);
       res.json(trackings);
     } catch (error) {
       res.status(500).json({ message: "Failed to get retirement tracking" });
     }
   });
 
-  // Create retirement tracking entry
   app.post("/api/retirement-tracking", upload.single('attachment'), async (req, res) => {
     try {
       const { type, title, description, receivedAt, source, priority, isActionRequired, actionDeadline, notes } = req.body;
@@ -165,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const trackingData = {
-        userId: 1,
+        userId: USER_ID,
         type,
         title,
         description,
@@ -173,37 +198,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         source,
         priority,
         isActionRequired: isActionRequired === 'true',
-        actionDeadline: actionDeadline ? new Date(actionDeadline) : undefined,
-        notes: notes || undefined,
-        attachmentFileName: req.file?.filename,
-        attachmentFileSize: req.file?.size
+        actionDeadline: actionDeadline ? new Date(actionDeadline) : null,
+        notes: notes || null,
+        attachmentFileName: req.file?.filename || null,
+        attachmentFileSize: req.file?.size || null,
       };
 
       const tracking = await storage.createRetirementTracking(trackingData);
-      res.json(tracking);
+
+      let calendarEventCreated = false;
+      if (tracking.isActionRequired && tracking.actionDeadline) {
+        const integration = await storage.getGoogleIntegration(USER_ID);
+        if (integration) {
+          const event = {
+            summary: tracking.title,
+            description: `${tracking.description}\n\nNotes: ${tracking.notes || 'N/A'}`,
+            start: {
+              dateTime: tracking.actionDeadline.toISOString(),
+              timeZone: 'America/Los_Angeles' // Should ideally be user's timezone
+            },
+            end: {
+              dateTime: new Date(tracking.actionDeadline.getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
+              timeZone: 'America/Los_Angeles'
+            }
+          };
+          const result = await createCalendarEvent(USER_ID, event);
+          calendarEventCreated = result.success;
+        }
+      }
+      
+      res.json({ ...tracking, calendarEventCreated });
     } catch (error) {
       res.status(500).json({ message: "Failed to create retirement tracking entry" });
     }
   });
 
-  // Update retirement tracking entry
-  app.patch("/api/retirement-tracking/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updates = req.body;
-      
-      const tracking = await storage.updateRetirementTracking(id, updates);
-      if (!tracking) {
-        return res.status(404).json({ message: "Retirement tracking entry not found" });
-      }
-      
-      res.json(tracking);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update retirement tracking entry" });
-    }
-  });
-
-  // Delete retirement tracking entry
   app.delete("/api/retirement-tracking/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -218,8 +247,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to delete retirement tracking entry" });
     }
   });
+  
+  // --- CONTACTS ROUTES ---
 
-  // Serve uploaded files
+  app.get("/api/contacts", async (req, res) => {
+    try {
+        const contacts = await storage.getContactsByUserId(USER_ID);
+        res.json(contacts);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to get contacts." });
+    }
+  });
+
+  app.post("/api/contacts", async (req, res) => {
+      try {
+          const contactData = insertContactSchema.parse({ ...req.body, userId: USER_ID });
+          const newContact = await storage.createContact(contactData);
+          res.status(201).json(newContact);
+      } catch (error) {
+          res.status(400).json({ message: "Invalid contact data.", error });
+      }
+  });
+
+  app.patch("/api/contacts/:id", async (req, res) => {
+      try {
+          const id = parseInt(req.params.id);
+          const contactData = insertContactSchema.partial().parse(req.body);
+          const updatedContact = await storage.updateContact(id, contactData);
+          if (!updatedContact) {
+              return res.status(404).json({ message: "Contact not found." });
+          }
+          res.json(updatedContact);
+      } catch (error) {
+          res.status(400).json({ message: "Invalid contact data.", error });
+      }
+  });
+
+  app.delete("/api/contacts/:id", async (req, res) => {
+      try {
+          const id = parseInt(req.params.id);
+          const success = await storage.deleteContact(id);
+          if (!success) {
+              return res.status(404).json({ message: "Contact not found." });
+          }
+          res.status(204).send();
+      } catch (error) {
+          res.status(500).json({ message: "Failed to delete contact." });
+      }
+  });
+
+  // --- EMAIL ROUTE ---
+  
+  app.post("/api/email/send", async (req, res) => {
+    try {
+      const { to, subject, body, attachmentIds } = req.body; // attachmentIds is an array of document IDs
+      if (!to || !subject || !body) {
+        return res.status(400).json({ message: "To, subject, and body are required." });
+      }
+
+      const attachments = [];
+      if (attachmentIds && Array.isArray(attachmentIds)) {
+        for (const id of attachmentIds) {
+          const doc = await storage.getDocument(id);
+          if (doc && doc.fileName) {
+            attachments.push(doc);
+          }
+        }
+      }
+
+      const result = await sendEmail(USER_ID, to, subject, body, attachments);
+      if (result.success) {
+        res.json({ message: "Email sent successfully." });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to send email.", error: (error as Error).message });
+    }
+  });
+
+  // --- OTHER ROUTES ---
+
   app.get("/api/files/:filename", (req, res) => {
     const filename = req.params.filename;
     const filepath = path.join(uploadDir, filename);

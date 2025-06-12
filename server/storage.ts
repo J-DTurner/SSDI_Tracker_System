@@ -1,6 +1,7 @@
-import { users, sections, documents, retirementTracking, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking } from "@shared/schema";
+import { users, sections, documents, retirementTracking, googleIntegrations, contacts, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking, type GoogleIntegration, type InsertGoogleIntegration, type Contact, type InsertContact } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
+import { encrypt } from "./encryption";
 
 export interface IStorage {
   // User operations
@@ -27,6 +28,18 @@ export interface IStorage {
   createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking>;
   updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined>;
   deleteRetirementTracking(id: number): Promise<boolean>;
+
+  // Google Integration operations
+  getGoogleIntegration(userId: number): Promise<GoogleIntegration | undefined>;
+  createOrUpdateGoogleIntegration(integration: InsertGoogleIntegration): Promise<GoogleIntegration>;
+  updateGoogleIntegration(userId: number, integration: Partial<InsertGoogleIntegration>): Promise<GoogleIntegration | undefined>;
+  deleteGoogleIntegration(userId: number): Promise<boolean>;
+
+  // Contact operations
+  getContactsByUserId(userId: number): Promise<Contact[]>;
+  createContact(contact: InsertContact): Promise<Contact>;
+  updateContact(id: number, contact: Partial<InsertContact>): Promise<Contact | undefined>;
+  deleteContact(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -151,7 +164,82 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
+  // Google Integration Methods
+  async getGoogleIntegration(userId: number): Promise<GoogleIntegration | undefined> {
+    const [integration] = await db.select().from(googleIntegrations).where(eq(googleIntegrations.userId, userId));
+    return integration || undefined;
+  }
+
+  async createOrUpdateGoogleIntegration(integration: InsertGoogleIntegration): Promise<GoogleIntegration> {
+    const encryptedIntegration = {
+      ...integration,
+      refreshToken: encrypt(integration.refreshToken),
+    };
+
+    const [newIntegration] = await db.insert(googleIntegrations)
+      .values(encryptedIntegration)
+      .onConflictDoUpdate({ 
+        target: googleIntegrations.userId, 
+        set: {
+          email: encryptedIntegration.email,
+          accessToken: encryptedIntegration.accessToken,
+          refreshToken: encryptedIntegration.refreshToken,
+          expiryDate: encryptedIntegration.expiryDate,
+          scopes: encryptedIntegration.scopes,
+        }
+      })
+      .returning();
+    return newIntegration;
+  }
+
+  async updateGoogleIntegration(userId: number, integrationUpdate: Partial<InsertGoogleIntegration>): Promise<GoogleIntegration | undefined> {
+    let updateData = { ...integrationUpdate };
+    if (integrationUpdate.refreshToken) {
+      updateData.refreshToken = encrypt(integrationUpdate.refreshToken);
+    }
+
+    const [updatedIntegration] = await db
+      .update(googleIntegrations)
+      .set(updateData)
+      .where(eq(googleIntegrations.userId, userId))
+      .returning();
+    return updatedIntegration || undefined;
+  }
+
+  async deleteGoogleIntegration(userId: number): Promise<boolean> {
+    const result = await db.delete(googleIntegrations).where(eq(googleIntegrations.userId, userId));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Contact Methods
+  async getContactsByUserId(userId: number): Promise<Contact[]> {
+    return await db.select().from(contacts).where(eq(contacts.userId, userId)).orderBy(desc(contacts.createdAt));
+  }
+
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const [newContact] = await db.insert(contacts).values(contact).returning();
+    return newContact;
+  }
+
+  async updateContact(id: number, contactUpdate: Partial<InsertContact>): Promise<Contact | undefined> {
+    const [updatedContact] = await db
+      .update(contacts)
+      .set(contactUpdate)
+      .where(eq(contacts.id, id))
+      .returning();
+    return updatedContact || undefined;
+  }
+
+  async deleteContact(id: number): Promise<boolean> {
+    const result = await db.delete(contacts).where(eq(contacts.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
   private async initializeSampleData() {
+    // Check if user already exists
+    const existingUser = await this.getUser(1);
+    if(existingUser) return;
+
     // Create sample user
     const user = await this.createUser({
       username: "john.smith",
