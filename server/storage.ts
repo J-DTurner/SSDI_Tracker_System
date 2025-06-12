@@ -55,11 +55,6 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async getUserByReplitId(replitUserId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.replitUserId, replitUserId));
-    return user || undefined;
-  }
-
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
@@ -71,33 +66,6 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
-  }
-
-  async upsertUserByReplitId(replitUserId: string, userData: Partial<InsertUser>): Promise<User> {
-    const existingUser = await this.getUserByReplitId(replitUserId);
-    
-    if (existingUser) {
-      const [user] = await db
-        .update(users)
-        .set({
-          ...userData,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.replitUserId, replitUserId))
-        .returning();
-      return user;
-    } else {
-      const [user] = await db
-        .insert(users)
-        .values({
-          replitUserId,
-          username: userData.email || `user_${replitUserId}`,
-          password: 'replit_auth',
-          ...userData,
-        })
-        .returning();
-      return user;
-    }
   }
 
   async getSectionsByUserId(userId: number): Promise<Section[]> {

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { googleAuthUrl, getTokensFromCode, getUserInfo, createCalendarEvent, sendEmail } from "./google";
 import { insertDocumentSchema, insertRetirementTrackingSchema, insertContactSchema } from "@shared/schema";
+import { setupAuth, requireAuth } from "./auth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
