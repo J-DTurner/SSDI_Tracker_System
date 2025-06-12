@@ -1,4 +1,6 @@
 import { users, sections, documents, retirementTracking, type User, type InsertUser, type Section, type InsertSection, type Document, type InsertDocument, type RetirementTracking, type InsertRetirementTracking } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -27,148 +29,126 @@ export interface IStorage {
   deleteRetirementTracking(id: number): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private sections: Map<number, Section>;
-  private documents: Map<number, Document>;
-  private retirementTrackings: Map<number, RetirementTracking>;
-  private currentUserId: number;
-  private currentSectionId: number;
-  private currentDocumentId: number;
-  private currentRetirementTrackingId: number;
-
+export class DatabaseStorage implements IStorage {
   constructor() {
-    this.users = new Map();
-    this.sections = new Map();
-    this.documents = new Map();
-    this.retirementTrackings = new Map();
-    this.currentUserId = 1;
-    this.currentSectionId = 1;
-    this.currentDocumentId = 1;
-    this.currentRetirementTrackingId = 1;
-    
-    // Initialize with sample user and sections
+    // Initialize with sample data if needed
     this.initializeSampleData();
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   async getSectionsByUserId(userId: number): Promise<Section[]> {
-    return Array.from(this.sections.values())
-      .filter(section => section.userId === userId)
-      .sort((a, b) => a.order - b.order);
+    return await db.select().from(sections).where(eq(sections.userId, userId)).orderBy(sections.order);
   }
 
   async getSection(id: number): Promise<Section | undefined> {
-    return this.sections.get(id);
+    const [section] = await db.select().from(sections).where(eq(sections.id, id));
+    return section || undefined;
   }
 
   async createSection(section: InsertSection): Promise<Section> {
-    const id = this.currentSectionId++;
-    const newSection: Section = { ...section, id };
-    this.sections.set(id, newSection);
+    const [newSection] = await db
+      .insert(sections)
+      .values(section)
+      .returning();
     return newSection;
   }
 
   async updateSectionStatus(id: number, status: string): Promise<Section | undefined> {
-    const section = this.sections.get(id);
-    if (!section) return undefined;
-    
-    const updatedSection = { ...section, status };
-    this.sections.set(id, updatedSection);
-    return updatedSection;
+    const [updatedSection] = await db
+      .update(sections)
+      .set({ status })
+      .where(eq(sections.id, id))
+      .returning();
+    return updatedSection || undefined;
   }
 
   async getDocumentsBySectionId(sectionId: number): Promise<Document[]> {
-    return Array.from(this.documents.values())
-      .filter(doc => doc.sectionId === sectionId);
+    return await db.select().from(documents).where(eq(documents.sectionId, sectionId));
   }
 
   async getDocument(id: number): Promise<Document | undefined> {
-    return this.documents.get(id);
+    const [document] = await db.select().from(documents).where(eq(documents.id, id));
+    return document || undefined;
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
-    const id = this.currentDocumentId++;
-    const newDocument: Document = { 
-      ...document, 
-      id,
-      fileName: document.fileName || null,
-      fileSize: document.fileSize || null,
-      contactInfo: document.contactInfo || null,
-      notes: document.notes || null,
+    const documentToInsert = {
+      ...document,
       uploadedAt: document.status === 'uploaded' ? new Date() : null
     };
-    this.documents.set(id, newDocument);
+    
+    const [newDocument] = await db
+      .insert(documents)
+      .values(documentToInsert)
+      .returning();
     return newDocument;
   }
 
-  async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
-    const existing = this.documents.get(id);
-    if (!existing) return undefined;
-    
-    const updatedDocument = { 
-      ...existing, 
-      ...document,
-      uploadedAt: document.status === 'uploaded' ? new Date() : existing.uploadedAt
+  async updateDocument(id: number, documentUpdate: Partial<InsertDocument>): Promise<Document | undefined> {
+    const updateData = {
+      ...documentUpdate,
+      uploadedAt: documentUpdate.status === 'uploaded' ? new Date() : undefined
     };
-    this.documents.set(id, updatedDocument);
-    return updatedDocument;
+    
+    const [updatedDocument] = await db
+      .update(documents)
+      .set(updateData)
+      .where(eq(documents.id, id))
+      .returning();
+    return updatedDocument || undefined;
   }
 
   async deleteDocument(id: number): Promise<boolean> {
-    return this.documents.delete(id);
+    const result = await db.delete(documents).where(eq(documents.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async getRetirementTrackingByUserId(userId: number): Promise<RetirementTracking[]> {
-    return Array.from(this.retirementTrackings.values())
-      .filter(tracking => tracking.userId === userId)
-      .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+    return await db.select().from(retirementTracking).where(eq(retirementTracking.userId, userId)).orderBy(desc(retirementTracking.receivedAt));
   }
 
   async getRetirementTracking(id: number): Promise<RetirementTracking | undefined> {
-    return this.retirementTrackings.get(id);
+    const [tracking] = await db.select().from(retirementTracking).where(eq(retirementTracking.id, id));
+    return tracking || undefined;
   }
 
   async createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking> {
-    const id = this.currentRetirementTrackingId++;
-    const newTracking: RetirementTracking = {
-      ...tracking,
-      id,
-      attachmentFileName: tracking.attachmentFileName || null,
-      attachmentFileSize: tracking.attachmentFileSize || null,
-      actionDeadline: tracking.actionDeadline || null,
-      notes: tracking.notes || null,
-      isActionRequired: tracking.isActionRequired ?? false,
-    };
-    this.retirementTrackings.set(id, newTracking);
+    const [newTracking] = await db
+      .insert(retirementTracking)
+      .values(tracking)
+      .returning();
     return newTracking;
   }
 
-  async updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined> {
-    const existing = this.retirementTrackings.get(id);
-    if (!existing) return undefined;
-    
-    const updatedTracking = { ...existing, ...tracking };
-    this.retirementTrackings.set(id, updatedTracking);
-    return updatedTracking;
+  async updateRetirementTracking(id: number, trackingUpdate: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined> {
+    const [updatedTracking] = await db
+      .update(retirementTracking)
+      .set(trackingUpdate)
+      .where(eq(retirementTracking.id, id))
+      .returning();
+    return updatedTracking || undefined;
   }
 
   async deleteRetirementTracking(id: number): Promise<boolean> {
-    return this.retirementTrackings.delete(id);
+    const result = await db.delete(retirementTracking).where(eq(retirementTracking.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   private async initializeSampleData() {
@@ -358,4 +338,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
