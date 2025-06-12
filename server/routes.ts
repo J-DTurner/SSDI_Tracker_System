@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDocumentSchema } from "@shared/schema";
+import { insertDocumentSchema, insertRetirementTrackingSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -142,6 +142,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(section);
     } catch (error) {
       res.status(500).json({ message: "Failed to update section status" });
+    }
+  });
+
+  // Get retirement tracking entries for current user
+  app.get("/api/retirement-tracking", async (req, res) => {
+    try {
+      const trackings = await storage.getRetirementTrackingByUserId(1);
+      res.json(trackings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get retirement tracking" });
+    }
+  });
+
+  // Create retirement tracking entry
+  app.post("/api/retirement-tracking", upload.single('attachment'), async (req, res) => {
+    try {
+      const { type, title, description, receivedAt, source, priority, isActionRequired, actionDeadline, notes } = req.body;
+      
+      if (!type || !title || !description || !receivedAt || !source || !priority) {
+        return res.status(400).json({ message: "Required fields missing" });
+      }
+
+      const trackingData = {
+        userId: 1,
+        type,
+        title,
+        description,
+        receivedAt: new Date(receivedAt),
+        source,
+        priority,
+        isActionRequired: isActionRequired === 'true',
+        actionDeadline: actionDeadline ? new Date(actionDeadline) : undefined,
+        notes: notes || undefined,
+        attachmentFileName: req.file?.filename,
+        attachmentFileSize: req.file?.size
+      };
+
+      const tracking = await storage.createRetirementTracking(trackingData);
+      res.json(tracking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create retirement tracking entry" });
+    }
+  });
+
+  // Update retirement tracking entry
+  app.patch("/api/retirement-tracking/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+      
+      const tracking = await storage.updateRetirementTracking(id, updates);
+      if (!tracking) {
+        return res.status(404).json({ message: "Retirement tracking entry not found" });
+      }
+      
+      res.json(tracking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update retirement tracking entry" });
+    }
+  });
+
+  // Delete retirement tracking entry
+  app.delete("/api/retirement-tracking/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteRetirementTracking(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Retirement tracking entry not found" });
+      }
+      
+      res.json({ message: "Retirement tracking entry deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete retirement tracking entry" });
     }
   });
 

@@ -51,7 +51,88 @@ export class MemStorage implements IStorage {
     this.initializeSampleData();
   }
 
-  // Retirement tracking operations
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.username === username);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.currentUserId++;
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async getSectionsByUserId(userId: number): Promise<Section[]> {
+    return Array.from(this.sections.values())
+      .filter(section => section.userId === userId)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  async getSection(id: number): Promise<Section | undefined> {
+    return this.sections.get(id);
+  }
+
+  async createSection(section: InsertSection): Promise<Section> {
+    const id = this.currentSectionId++;
+    const newSection: Section = { ...section, id };
+    this.sections.set(id, newSection);
+    return newSection;
+  }
+
+  async updateSectionStatus(id: number, status: string): Promise<Section | undefined> {
+    const section = this.sections.get(id);
+    if (!section) return undefined;
+    
+    const updatedSection = { ...section, status };
+    this.sections.set(id, updatedSection);
+    return updatedSection;
+  }
+
+  async getDocumentsBySectionId(sectionId: number): Promise<Document[]> {
+    return Array.from(this.documents.values())
+      .filter(doc => doc.sectionId === sectionId);
+  }
+
+  async getDocument(id: number): Promise<Document | undefined> {
+    return this.documents.get(id);
+  }
+
+  async createDocument(document: InsertDocument): Promise<Document> {
+    const id = this.currentDocumentId++;
+    const newDocument: Document = { 
+      ...document, 
+      id,
+      fileName: document.fileName || null,
+      fileSize: document.fileSize || null,
+      contactInfo: document.contactInfo || null,
+      notes: document.notes || null,
+      uploadedAt: document.status === 'uploaded' ? new Date() : null
+    };
+    this.documents.set(id, newDocument);
+    return newDocument;
+  }
+
+  async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
+    const existing = this.documents.get(id);
+    if (!existing) return undefined;
+    
+    const updatedDocument = { 
+      ...existing, 
+      ...document,
+      uploadedAt: document.status === 'uploaded' ? new Date() : existing.uploadedAt
+    };
+    this.documents.set(id, updatedDocument);
+    return updatedDocument;
+  }
+
+  async deleteDocument(id: number): Promise<boolean> {
+    return this.documents.delete(id);
+  }
+
   async getRetirementTrackingByUserId(userId: number): Promise<RetirementTracking[]> {
     return Array.from(this.retirementTrackings.values())
       .filter(tracking => tracking.userId === userId)
@@ -71,6 +152,7 @@ export class MemStorage implements IStorage {
       attachmentFileSize: tracking.attachmentFileSize || null,
       actionDeadline: tracking.actionDeadline || null,
       notes: tracking.notes || null,
+      isActionRequired: tracking.isActionRequired ?? false,
     };
     this.retirementTrackings.set(id, newTracking);
     return newTracking;
@@ -273,125 +355,6 @@ export class MemStorage implements IStorage {
       actionDeadline: new Date("2024-03-15T14:00:00Z"),
       notes: "Appointment with Dr. Wilson at Downtown Medical Center. Bring ID and insurance cards."
     });
-  }
-
-  async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
-  }
-
-  async getSectionsByUserId(userId: number): Promise<Section[]> {
-    return Array.from(this.sections.values())
-      .filter(section => section.userId === userId)
-      .sort((a, b) => a.order - b.order);
-  }
-
-  async getSection(id: number): Promise<Section | undefined> {
-    return this.sections.get(id);
-  }
-
-  async createSection(section: InsertSection): Promise<Section> {
-    const id = this.currentSectionId++;
-    const newSection: Section = { ...section, id };
-    this.sections.set(id, newSection);
-    return newSection;
-  }
-
-  async updateSectionStatus(id: number, status: string): Promise<Section | undefined> {
-    const section = this.sections.get(id);
-    if (!section) return undefined;
-    
-    const updatedSection = { ...section, status };
-    this.sections.set(id, updatedSection);
-    return updatedSection;
-  }
-
-  async getDocumentsBySectionId(sectionId: number): Promise<Document[]> {
-    return Array.from(this.documents.values())
-      .filter(doc => doc.sectionId === sectionId);
-  }
-
-  async getDocument(id: number): Promise<Document | undefined> {
-    return this.documents.get(id);
-  }
-
-  async createDocument(document: InsertDocument): Promise<Document> {
-    const id = this.currentDocumentId++;
-    const newDocument: Document = { 
-      ...document, 
-      id,
-      fileName: document.fileName || null,
-      fileSize: document.fileSize || null,
-      contactInfo: document.contactInfo || null,
-      notes: document.notes || null,
-      uploadedAt: document.status === 'uploaded' ? new Date() : null
-    };
-    this.documents.set(id, newDocument);
-    return newDocument;
-  }
-
-  async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
-    const existing = this.documents.get(id);
-    if (!existing) return undefined;
-    
-    const updatedDocument = { 
-      ...existing, 
-      ...document,
-      uploadedAt: document.status === 'uploaded' ? new Date() : existing.uploadedAt
-    };
-    this.documents.set(id, updatedDocument);
-    return updatedDocument;
-  }
-
-  async deleteDocument(id: number): Promise<boolean> {
-    return this.documents.delete(id);
-  }
-
-  async getRetirementTrackingByUserId(userId: number): Promise<RetirementTracking[]> {
-    return Array.from(this.retirementTrackings.values())
-      .filter(tracking => tracking.userId === userId)
-      .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
-  }
-
-  async getRetirementTracking(id: number): Promise<RetirementTracking | undefined> {
-    return this.retirementTrackings.get(id);
-  }
-
-  async createRetirementTracking(tracking: InsertRetirementTracking): Promise<RetirementTracking> {
-    const id = this.currentRetirementTrackingId++;
-    const newTracking: RetirementTracking = {
-      ...tracking,
-      id,
-      attachmentFileName: tracking.attachmentFileName || null,
-      attachmentFileSize: tracking.attachmentFileSize || null,
-      actionDeadline: tracking.actionDeadline || null,
-      notes: tracking.notes || null,
-    };
-    this.retirementTrackings.set(id, newTracking);
-    return newTracking;
-  }
-
-  async updateRetirementTracking(id: number, tracking: Partial<InsertRetirementTracking>): Promise<RetirementTracking | undefined> {
-    const existing = this.retirementTrackings.get(id);
-    if (!existing) return undefined;
-    
-    const updatedTracking = { ...existing, ...tracking };
-    this.retirementTrackings.set(id, updatedTracking);
-    return updatedTracking;
-  }
-
-  async deleteRetirementTracking(id: number): Promise<boolean> {
-    return this.retirementTrackings.delete(id);
   }
 }
 
