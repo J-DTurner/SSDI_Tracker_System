@@ -180,21 +180,23 @@ export class DatabaseStorage implements IStorage {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     // 1. Get items needing attention
-    const missingDocs = await db.select({
-      type: 'missing_document',
-      id: documents.id,
-      title: documents.name,
-      description: sections.name,
-      sectionId: documents.sectionId,
-      sectionName: sections.name,
-      deadline: null,
-      isOverdue: false,
-    })
+    const missingDocsRaw = await db.select()
     .from(documents)
     .innerJoin(sections, eq(documents.sectionId, sections.id))
     .where(and(eq(documents.status, 'missing'), eq(sections.userId, userId)));
 
-    const requiredActions = await db.select()
+    const missingDocs = missingDocsRaw.map(row => ({
+      type: 'missing_document',
+      id: row.documents.id,
+      title: row.documents.name,
+      description: row.documents.description,
+      sectionId: row.documents.sectionId,
+      sectionName: row.sections.name,
+      deadline: null,
+      isOverdue: false,
+    }));
+
+    const requiredActionsRaw = await db.select()
     .from(retirementTracking)
     .where(and(
       eq(retirementTracking.userId, userId),
@@ -202,7 +204,7 @@ export class DatabaseStorage implements IStorage {
       isNull(retirementTracking.actionCompletedAt)
     ));
     
-    const formattedRequiredActions = requiredActions.map(item => ({
+    const formattedRequiredActions = requiredActionsRaw.map(item => ({
       type: 'required_action',
       id: item.id,
       title: item.title,
@@ -221,12 +223,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     // 2. Get completed items
-    const recentlyUploaded = await db.select({
-      type: 'completed_document',
-      id: documents.id,
-      title: documents.name,
-      completedAt: documents.uploadedAt
-    })
+    const recentlyUploadedRaw = await db.select()
     .from(documents)
     .innerJoin(sections, eq(documents.sectionId, sections.id))
     .where(and(
@@ -235,19 +232,28 @@ export class DatabaseStorage implements IStorage {
       gt(documents.uploadedAt, sevenDaysAgo),
       isNotNull(documents.uploadedAt)
     ));
+
+    const recentlyUploaded = recentlyUploadedRaw.map(row => ({
+      type: 'completed_document',
+      id: row.documents.id,
+      title: row.documents.name,
+      completedAt: row.documents.uploadedAt
+    }));
     
-    const recentlyCompletedActions = await db.select({
-      type: 'completed_action',
-      id: retirementTracking.id,
-      title: retirementTracking.title,
-      completedAt: retirementTracking.actionCompletedAt
-    })
+    const recentlyCompletedActionsRaw = await db.select()
     .from(retirementTracking)
     .where(and(
       eq(retirementTracking.userId, userId),
       gt(retirementTracking.actionCompletedAt, sevenDaysAgo),
       isNotNull(retirementTracking.actionCompletedAt)
     ));
+
+    const recentlyCompletedActions = recentlyCompletedActionsRaw.map(item => ({
+      type: 'completed_action',
+      id: item.id,
+      title: item.title,
+      completedAt: item.actionCompletedAt
+    }));
 
     const completed = [...recentlyUploaded, ...recentlyCompletedActions]
       .filter(item => item.completedAt)
